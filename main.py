@@ -2,11 +2,15 @@
 from optparse import OptionParser
 
 import chiron
+import rusti
 
 def init_match_engine():
     match_engine = chiron.MatchEngine()
-    add_default_fetchers(match_engine)
-    add_default_matchers(match_engine)
+    #add_default_fetchers(match_engine)
+    #add_default_matchers(match_engine)
+    match_engine.add_classes(['geofft-test', 'geofft'])
+    match_engine.add_fetchers({'rusti': rusti.evaluate})
+    match_engine.add_matcher('rusti', r'^rusti: (.*)')
     return match_engine
 
 def add_default_classes(match_engine):
