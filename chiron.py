@@ -14,6 +14,11 @@ import csv
 seen_timeout = 5 * 60
 parser = etree.HTMLParser(encoding='UTF-8')
 
+class Response(object):
+    def __init__(self, url, title):
+        self.url = url
+        self.title = title
+
 class Message(object):
     def log_arrival(self, ):
         print '%s: -c %s -i "%s": %s -> %s' % (
@@ -66,9 +71,9 @@ def fetch_bugzilla(url):
         t = etree.parse(f, parser)
         title = t.xpath('string(//span[@id="short_desc_nonedit_display"])')
         if title:
-            return u, title
+            return Response(u, title)
         else:
-            return u, None
+            return Response(u, None)
     return bugzilla_fetcher
 
 def fetch_trac(url):
@@ -77,9 +82,9 @@ def fetch_trac(url):
         f = urllib.urlopen(u + '?format=csv')
         if f.getcode() == 200:
             d = dict(zip(*csv.reader(f)))
-            return u, unicode(d['summary'], 'utf-8')
+            return Response(u, unicode(d['summary'], 'utf-8'))
         else:
-            return u, None
+            return Response(u, None)
     return trac_fetcher
 
 def fetch_github(user, repo, ):
@@ -88,9 +93,9 @@ def fetch_github(user, repo, ):
         f = urllib.urlopen(u)
         j = json.load(f)
         try:
-            return j['html_url'], j['title']
+            return Response(j['html_url'], j['title'])
         except KeyError:
-            return u, None
+            return Response(u, None)
     return fetch
 
 # Project-specific fetchers
@@ -100,7 +105,7 @@ def fetch_rfc(number):
     f = urllib.urlopen(u)
     t = etree.parse(f, parser)
     title = t.xpath('string(//meta[@name="DC.Title"]/@content)')
-    return u, (title or None)
+    return Response(u, (title or None))
 
 fetch_cve_rhbz = fetch_bugzilla("https://bugzilla.redhat.com")
 def fetch_cve(ticket):
@@ -108,16 +113,16 @@ def fetch_cve(ticket):
     url, title = fetch_cve_rhbz(ticket)
     print "RHBZ url='%s' title='%s'" % (url, title)
     if title:
-        return url, "[RHBZ] " + title
+        return Response(url, "[RHBZ] " + title)
 
     u = 'http://cve.mitre.org/cgi-bin/cvename.cgi?name=%s' % ticket
     f = urllib.urlopen(u)
     t = etree.parse(f, parser)
     title = t.xpath('string(//tr[th="Description"]/following::tr[1])')
     if title:
-        return u, "\n" + title.strip() + "\n"
+        return Response(u, "\n" + title.strip() + "\n")
     else:
-        return u, None
+        return Response(u, None)
 
 def fetch_scripts_faq(ticket):
     u = 'http://scripts.mit.edu/faq/%s' % ticket
@@ -125,18 +130,18 @@ def fetch_scripts_faq(ticket):
     t = etree.parse(f, parser)
     title = t.xpath('string(//h3[@class="storytitle"])')
     if title:
-        return u, title
+        return Response(u, title)
     else:
-        return u, None
+        return Response(u, None)
 
 def fetch_launchpad(ticket):
     u = 'http://api.launchpad.net/1.0/bugs/%s' % ticket
     f = urllib.urlopen(u)
     j = json.load(f)
     try:
-        return j['web_link'], j['title']
+        return Response(j['web_link'], j['title'])
     except KeyError:
-        return u, None
+        return Response(u, None)
 
 def fetch_debbugs(url):
     def debbugs_fetcher(ticket):
@@ -145,9 +150,9 @@ def fetch_debbugs(url):
         t = etree.parse(f, parser)
         title = t.xpath('normalize-space(//h1/child::text()[2])')
         if title:
-            return u, title
+            return Response(u, title)
         else:
-            return u, None
+            return Response(u, None)
     return debbugs_fetcher
 
 def fetch_dsa(number):
@@ -161,7 +166,7 @@ def fetch_dsa(number):
         dsa_url = dsa_urls[0]
     else:
         dsa_url = tu
-    return dsa_url, title
+    return Response(dsa_url, title)
 
 
 def fetch_pokemon(ticket):
@@ -172,10 +177,10 @@ def fetch_pokemon(ticket):
             (id, name) = line.split('|')[2:4]
             try:
                 if int(id) == int(ticket):
-                    return u, "%s (%s)" % (name, ", ".join(line.split('}')[0].split('|')[5:]))
+                    return Response(u, "%s (%s)" % (name, ", ".join(line.split('}')[0].split('|')[5:])))
             except ValueError:
                 pass
-    return u, None
+    return Response(u, None)
 
 def fetch_mit_class(ticket):
     u = 'http://student.mit.edu/catalog/search.cgi?search=%s' % (ticket, )
@@ -183,9 +188,9 @@ def fetch_mit_class(ticket):
     t = etree.parse(f, parser)
     title = t.xpath('string(//h3)')
     if title:
-        return u, title
+        return Response(u, title)
     else:
-        return u, None
+        return Response(u, None)
 
 def fetch_whats(whats):
     u = "http://stuff.mit.edu/cgi/whats.cgi?%s" % (whats, )
@@ -194,7 +199,7 @@ def fetch_whats(whats):
     title = t.xpath('string(//dl/dd)')
     if title:
         title = title.strip()
-    return u, (title or None)
+    return Response(u, (title or None))
 
 def undebathena_fun():
     u = 'http://debathena.mit.edu/trac/wiki/PackageNamesWeDidntUse'
@@ -204,14 +209,14 @@ def undebathena_fun():
     dir = choice(['/etc', '/bin', '/usr/bin', '/sbin', '/usr/sbin',
                   '/dev/mapper', '/etc/default', '/var/run'])
     file = choice(os.listdir(dir))
-    return u, "%s should divert %s/%s" % (package, dir, file)
+    return Response(u, "%s should divert %s/%s" % (package, dir, file))
 
 def fetch_bible(verse):
     u = 'http://www.esvapi.org/v2/rest/passageQuery?key=IP&passage=%s&output-format=plain-text' % (urllib.quote_plus(verse), )
     bible_text = urllib.urlopen(u).read()
     copyright = "(From The Holy Bible, English Standard Version. See http://www.crosswaybibles.org and http://www.esvapi.org/.)"
     text = "\n%s\n%s" % (bible_text, copyright, )
-    return u, text
+    return Response(u, text)
 
 def fetch_xkcd(comic):
     u = 'http://xkcd.com/%s/' % (comic, )
@@ -219,9 +224,9 @@ def fetch_xkcd(comic):
     t = etree.parse(f, parser)
     title = t.xpath('string(//title)')
     if title and f.getcode() == 200:
-        return u, title
+        return Response(u, title)
     else:
-        return u, None
+        return Response(u, None)
 
 def fetch_unicode(codepoint):
     u = 'http://www.fileformat.info/info/unicode/char/%s/index.htm' % (codepoint, )
@@ -229,9 +234,9 @@ def fetch_unicode(codepoint):
     t = etree.parse(f, parser)
     title = t.xpath('string(//title)')
     if title and f.getcode() == 200:
-        return u, title + ': ' + unichr(int(codepoint, 16))
+        return Response(u, title + ': ' + unichr(int(codepoint, 16)))
     else:
-        return u, None
+        return Response(u, None)
 
 def fetch_unicode_char(character):
     codepoint = format(ord(character), 'x')
@@ -240,9 +245,9 @@ def fetch_unicode_char(character):
     t = etree.parse(f, parser)
     title = t.xpath('string(//title)')
     if title and f.getcode() == 200:
-        return u, title
+        return Response(u, title)
     else:
-        return u, "U+%s" % (codepoint, )
+        return Response(u, "U+%s" % (codepoint, ))
 
 def fetch_airport(code):
     u = 'http://www.gcmap.com/airport/%s' % (code, )
@@ -255,22 +260,22 @@ def fetch_airport(code):
             title = "%s (%s)" % (place, name, )
         else:
             title = place
-        return u, title
+        return Response(u, title)
     else:
-        return u, None
+        return Response(u, None)
 
 
 # Special constant-text fetchers
 
 def deal_with_assassin(ticket):
-    return ("NO COMBOS OVER ZEPHYR",
+    return Response("NO COMBOS OVER ZEPHYR",
 """DO @b(NOT) ASK FOR OR SEND THE OFFICE COMBO
 OVER ZEPHYR, EVEN PERSONAL ZEPHYR.
 Instead, look in /mit/assassin/Office. If you don't have access,
 ask to be added.""")
 
 def invoke_science(ticket):
-    return ("SCIENCE!",
+    return Response("SCIENCE!",
 """
   ____   ____ ___ _____ _   _  ____ _____
  / ___| / ___|_ _| ____| \ | |/ ___| ____|
@@ -280,7 +285,7 @@ def invoke_science(ticket):
 """)
 
 def invoke_debothena(ticket):
-    return (ticket,
+    return Response(ticket,
 u"""
 ╺┳┓┏━╸┏┓ ┏━┓╺┳╸╻ ╻┏━╸┏┓╻┏━┓
  ┃┃┣╸ ┣┻┓┃ ┃ ┃ ┣━┫┣╸ ┃┗┫┣━┫
@@ -362,12 +367,11 @@ def format_tickets(last_seen, msg, tickets):
         # for personals, don't bother tracking age
         if old_enough or msg.is_personal():
             if msg.cls()[:2] == 'un':
-                u, t = undebathena_fun()
+                response = undebathena_fun()
             else:
-                u, t = fetcher(ticket)
-            if not t:
-                t = 'Unable to identify ticket %s' % ticket
-            message = '%s ticket %s: %s' % (tracker, ticket, t)
-            messages.append((message, u))
+                response = fetcher(ticket)
+            title = response.title or ('Unable to identify ticket %s' % ticket)
+            message = '%s ticket %s: %s' % (tracker, ticket, title)
+            messages.append((message, response.url))
             last_seen[(tracker, ticket, msg.cls())] = time.time()
     return messages
