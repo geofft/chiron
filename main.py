@@ -122,8 +122,8 @@ def parse_args():
     (options, args) = parser.parse_args()
     if len(args) != 0:
         parser.error("got %d arguments; expected none" % (len(args), ))
-    if options.protocol not in ('zephyr', 'zulip'):
-        parser.error("the only supported protocols are zephyr and zulip; you requested %s" % (options.protocol, ))
+    if options.protocol not in ('zephyr', 'zulip', 'cli'):
+        parser.error("the only supported protocols are zephyr and zulip and cli; you requested %s" % (options.protocol, ))
     if options.zuliprc and options.protocol != 'zulip':
         parser.error('Protocol must be "zulip" if --zulip-rc is provided.')
     if options.protocol != 'zephyr':
@@ -144,6 +144,8 @@ def run_with_args(match_engine):
         import chiron_zephyr as chiron_protocol
     elif options.protocol == 'zulip':
         import chiron_zulip as chiron_protocol
+    elif options.protocol == 'cli':
+        import chiron_cli as chiron_protocol
     else:
         raise ValueError
     chiron_protocol.main(match_engine, options)
